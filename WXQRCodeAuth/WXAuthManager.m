@@ -291,8 +291,15 @@ static NSString *const kConfirmFormat =
 
 - (void)openURLString:(NSString *)urlString {
     if (urlString.length == 0) return;
-    NSString *decoded = [urlString stringByRemovingPercentEncoding] ?: urlString;
-    NSURL *url = [NSURL URLWithString:decoded] ?: [NSURL URLWithString:urlString];
+    // wx_redirecturl 由服务端给出，本身就是可直接打开的明文 URL（state 已在内部编码）。
+    // 切勿整体 percent-decode，否则会破坏 state/code 中的编码字符。
+    NSURL *url = [NSURL URLWithString:urlString];
+    if (!url) {
+        // 仅在明文构造失败时，尝试编码后重试一次
+        NSString *encoded = [urlString stringByAddingPercentEncodingWithAllowedCharacters:
+                             [NSCharacterSet URLFragmentAllowedCharacterSet]];
+        url = [NSURL URLWithString:encoded];
+    }
     if (!url) return;
     dispatch_async(dispatch_get_main_queue(), ^{
         UIApplication *app = [UIApplication sharedApplication];
