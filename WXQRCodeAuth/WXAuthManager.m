@@ -298,29 +298,34 @@ static NSString *const kConfirmFormat =
                               message:[NSString stringWithFormat:@"%@授权成功，正在跳回…",
                                        nickname.length ? [nickname stringByAppendingString:@" "] : @""]];
 
+                    // 从微信回传 redirect 中解析 code 与 state（两者由服务器配对生成）
                     NSString *code = @"";
+                    NSString *stateBack = @"";
                     if (redirect.length) {
                         NSURLComponents *rc = [NSURLComponents componentsWithString:redirect];
                         for (NSURLQueryItem *it in rc.queryItems) {
-                            if ([it.name isEqualToString:@"code"] && it.value.length) { code = it.value; break; }
+                            if ([it.name isEqualToString:@"code"] && it.value.length && !code.length) code = it.value;
+                            if ([it.name isEqualToString:@"state"] && it.value.length && !stateBack.length) stateBack = it.value;
                         }
                     }
+                    // state 优先用微信回传的（与 code 配对），其次用来源 App 传入的
+                    NSString *finalState = stateBack.length ? stateBack : (self.stateParam ?: @"");
                     self.lastAuthCode = code;
-                    [self log:@"✅ 405 微信 redirect=%@", redirect.length ? redirect : @"(空)"];
-                    [self log:@"解析出 code=%@", code.length ? code : @"(空！)"];
+                    [self log:@"✅ 405 微信原始 redirect=%@", redirect.length ? redirect : @"(空)"];
+                    [self log:@"解析 code=%@", code.length ? code : @"(空！)"];
+                    [self log:@"state：微信回传=%@ / 来源传入=%@", stateBack.length?stateBack:@"(无)", self.stateParam.length?self.stateParam:@"(无)"];
 
                     NSString *target = nil;
                     if (code.length) {
                         // 标准微信 SDK 回调：wxAPPID://oauth?code=CODE&state=STATE
                         target = [NSString stringWithFormat:@"%@://oauth?code=%@&state=%@",
-                                  self.appid, code,
-                                  [self urlEncode:self.stateParam ?: @""]];
+                                  self.appid, code, [self urlEncode:finalState]];
                     } else if (redirect.length) {
                         // 解析不到 code 时，原样回跳兜底
                         target = redirect;
                     } else {
                         target = [NSString stringWithFormat:@"%@://oauth?code=&state=%@",
-                                  self.appid, [self urlEncode:self.stateParam ?: @""]];
+                                  self.appid, [self urlEncode:finalState]];
                     }
                     self.lastCallbackURL = target;
                     [self log:@"回跳 URL：%@", target];
