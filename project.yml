@@ -2,7 +2,7 @@ name: WXQRCodeAuth
 options:
   bundleIdPrefix: com.wxqr
   deploymentTarget:
-    iOS: "12.0"
+    iOS: "13.0"
   createIntermediateGroups: true
   developmentLanguage: zh-Hans
   # 兼容 GitHub Actions runner 上的 Xcode 15（默认会生成 Xcode 16 的 format 77）
@@ -35,7 +35,7 @@ targets:
         CFBundlePackageType: APPL
         CFBundleSignature: "????"
         LSRequiresIPhoneOS: true
-        MinimumOSVersion: "12.0"
+        MinimumOSVersion: "13.0"
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities:
           - armv7

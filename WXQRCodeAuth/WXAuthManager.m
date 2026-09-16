@@ -72,15 +72,33 @@ static NSString *const kConfirmFormat =
         if (item.name && item.value) params[item.name] = item.value;
     }
 
-    // 2) appid：优先 query 参数，兜底从整条 URL（含 path/resourceSpecifier）正则提取
+    // 同时准备一份 percent-decode 后的全文，兜底扫描被编码的参数
+    NSString *decoded = [absolute stringByRemovingPercentEncoding] ?: absolute;
+
+    // 2) appid：优先 query 参数，兜底从整条 URL（含 path/resourceSpecifier、解码后）正则提取
     NSString *appid = params[@"appid"];
     if (appid.length == 0) {
-        appid = [self firstMatchIn:absolute
-                          pattern:@"wx[a-fA-F0-9]{16,18}"
-                            group:0];
+        appid = [self firstMatchIn:absolute pattern:@"wx[a-fA-F0-9]{16,18}" group:0];
     }
-    NSString *stateParam = params[@"state"] ?: @"";
-    NSString *bundleId = sourceApplication.length ? sourceApplication : (params[@"bundleid"] ?: params[@"bundleId"] ?: @"");
+    if (appid.length == 0) {
+        appid = [self firstMatchIn:decoded pattern:@"wx[a-fA-F0-9]{16,18}" group:0];
+    }
+
+    // 3) state：优先 query，兜底从全文正则提取 state=xxx
+    NSString *stateParam = params[@"state"];
+    if (stateParam.length == 0) {
+        stateParam = [self firstMatchIn:absolute pattern:@"[?&]state=([^&]+)" group:1];
+    }
+    if (stateParam.length == 0) {
+        stateParam = [self firstMatchIn:decoded pattern:@"[?&]state=([^&]+)" group:1];
+    }
+    stateParam = stateParam ?: @"";
+
+    // 4) bundleid：优先来源 App 的 Bundle ID，其次 URL 参数
+    NSString *bundleId = sourceApplication.length
+        ? sourceApplication
+        : (params[@"bundleid"] ?: params[@"bundleId"] ?:
+           [self firstMatchIn:decoded pattern:@"wechat_app_bundleId=([^&]+)" group:1] ?: @"");
 
     if (appid.length == 0) {
         [self updateState:WXAuthStateError message:@"未能从跳转链接中解析出 appid"];
