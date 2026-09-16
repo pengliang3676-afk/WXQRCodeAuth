@@ -27,15 +27,22 @@ typedef NS_ENUM(NSInteger, WXAuthState) {
 @property (nonatomic, assign, readonly) WXAuthState state;
 @property (nonatomic, copy, readonly, nullable) NSString *appid;
 @property (nonatomic, copy, readonly, nullable) NSString *stateParam;
+@property (nonatomic, copy, readonly, nullable) NSString *scope;
 @property (nonatomic, copy, readonly, nullable) NSString *bundleId;
 @property (nonatomic, copy, readonly, nullable) NSString *appName;
 @property (nonatomic, copy, readonly, nullable) NSString *rawURLString;
 @property (nonatomic, strong, readonly, nullable) UIImage *qrImage;
+/// 最近一次授权码（调试可见）
+@property (nonatomic, copy, readonly, nullable) NSString *lastAuthCode;
+/// 最终回跳给来源 App 的 URL（调试可见）
+@property (nonatomic, copy, readonly, nullable) NSString *lastCallbackURL;
 
 /// 状态变化回调（主线程）
 @property (nonatomic, copy, nullable) void (^onStateChange)(WXAuthState state, NSString *message);
 /// 二维码生成回调（主线程）
 @property (nonatomic, copy, nullable) void (^onQRCodeReady)(UIImage *image);
+/// 诊断日志更新回调（主线程）——临时排查用
+@property (nonatomic, copy, nullable) void (^onDiagnostic)(NSString *text);
 
 + (instancetype)shared;
 

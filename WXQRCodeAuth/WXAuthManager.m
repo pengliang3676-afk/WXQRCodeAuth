@@ -12,7 +12,7 @@ static NSString *const kWXUserAgent =
     @"MicroMessenger/7.0.0(0x17000024) NetType/WIFI Language/zh_CN";
 
 static NSString *const kQrConnectFormat =
-    @"https://open.weixin.qq.com/connect/app/qrconnect?appid=%@&bundleid=%@&scope=snsapi_userinfo";
+    @"https://open.weixin.qq.com/connect/app/qrconnect?appid=%@&bundleid=%@&scope=%@";
 static NSString *const kLongPollFormat =
     @"https://long.open.weixin.qq.com/connect/l/qrconnect?uuid=%@&f=url&_=%.0f";
 static NSString *const kConfirmFormat =
@@ -22,10 +22,14 @@ static NSString *const kConfirmFormat =
 @property (nonatomic, assign) WXAuthState state;
 @property (nonatomic, copy, nullable) NSString *appid;
 @property (nonatomic, copy, nullable) NSString *stateParam;
+@property (nonatomic, copy, nullable) NSString *scope;
 @property (nonatomic, copy, nullable) NSString *bundleId;
 @property (nonatomic, copy, nullable) NSString *appName;
 @property (nonatomic, copy, nullable) NSString *rawURLString;
 @property (nonatomic, strong, nullable) UIImage *qrImage;
+@property (nonatomic, copy, nullable) NSString *lastAuthCode;
+@property (nonatomic, copy, nullable) NSString *lastCallbackURL;
+@property (nonatomic, strong) NSMutableString *diagLog;
 
 @property (nonatomic, copy, nullable) NSString *serverUuid;   // 微信服务器下发的二维码 uuid
 @property (nonatomic, copy, nullable) NSString *clientUuid;   // 本地生成、放在请求头的 uuid
@@ -50,12 +54,28 @@ static NSString *const kConfirmFormat =
     self = [super init];
     if (self) {
         _state = WXAuthStateIdle;
+        _diagLog = [NSMutableString string];
         NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration defaultSessionConfiguration];
         cfg.timeoutIntervalForRequest = 70;
         cfg.HTTPAdditionalHeaders = @{ @"User-Agent": kWXUserAgent };
         _session = [NSURLSession sessionWithConfiguration:cfg];
     }
     return self;
+}
+
+- (void)log:(NSString *)format, ... {
+    va_list args; va_start(args, format);
+    NSString *line = [[NSString alloc] initWithFormat:format arguments:args];
+    va_end(args);
+    NSLog(@"[WXQR] %@", line);
+    @synchronized (self.diagLog) {
+        if (self.diagLog.length > 4000) [self.diagLog setString:[self.diagLog substringFromIndex:2000]];
+        [self.diagLog appendFormat:@"%@\n", line];
+        NSString *snapshot = [self.diagLog copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.onDiagnostic) self.onDiagnostic(snapshot);
+        });
+    }
 }
 
 #pragma mark - 外部 URL 入口
@@ -100,18 +120,37 @@ static NSString *const kConfirmFormat =
         : (params[@"bundleid"] ?: params[@"bundleId"] ?:
            [self firstMatchIn:decoded pattern:@"wechat_app_bundleId=([^&]+)" group:1] ?: @"");
 
+    // 5) scope：优先来源 URL 自带，默认 snsapi_userinfo（必须与来源 App 请求一致）
+    NSString *scope = params[@"scope"];
+    if (scope.length == 0) {
+        scope = [self firstMatchIn:decoded pattern:@"[?&]scope=([^&]+)" group:1];
+    }
+    if (scope.length == 0) scope = @"snsapi_userinfo";
+
     if (appid.length == 0) {
+        [self log:@"❌ 解析失败，原始 URL：%@", absolute];
         [self updateState:WXAuthStateError message:@"未能从跳转链接中解析出 appid"];
         return;
     }
 
     [self stop];
+    @synchronized (self.diagLog) { [self.diagLog setString:@""]; }
     self.appid = appid;
     self.stateParam = stateParam;
+    self.scope = scope;
     self.bundleId = bundleId;
     self.serverUuid = nil;
     self.qrImage = nil;
+    self.lastAuthCode = nil;
+    self.lastCallbackURL = nil;
     self.finished = NO;
+
+    [self log:@"收到跳转：%@", absolute];
+    [self log:@"解析 → appid=%@", appid];
+    [self log:@"        state=%@", stateParam.length ? stateParam : @"(空)"];
+    [self log:@"        scope=%@", scope];
+    [self log:@"        bundleid=%@", bundleId.length ? bundleId : @"(空,将留空)"];
+    [self log:@"        sourceApp=%@", sourceApplication ?: @"(空)"];
 
     [self updateState:WXAuthStateReceived
               message:[NSString stringWithFormat:@"已接收授权请求\n%@", bundleId.length ? bundleId : appid]];
@@ -139,9 +178,12 @@ static NSString *const kConfirmFormat =
 
     self.clientUuid = [self randomClientUuid];
     NSString *bundleid = self.bundleId.length ? self.bundleId : @"";
+    NSString *scope = self.scope.length ? self.scope : @"snsapi_userinfo";
     NSString *path = [NSString stringWithFormat:kQrConnectFormat,
                       [self urlEncode:self.appid],
-                      [self urlEncode:bundleid]];
+                      [self urlEncode:bundleid],
+                      [self urlEncode:scope]];
+    [self log:@"请求 qrconnect（scope=%@, bundleid=%@）", scope, bundleid.length?bundleid:@"(空)"];
     NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:path]];
     req.HTTPMethod = @"GET";
     [req setValue:kWXUserAgent forHTTPHeaderField:@"User-Agent"];
@@ -156,12 +198,15 @@ static NSString *const kConfirmFormat =
         completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
+        NSInteger httpCode = [(NSHTTPURLResponse *)response statusCode];
         if (error || data.length == 0) {
+            [self log:@"❌ qrconnect 网络错误 HTTP=%ld：%@", (long)httpCode, error.localizedDescription ?: @"无数据"];
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self updateState:WXAuthStateError message:[NSString stringWithFormat:@"获取二维码失败：%@", error.localizedDescription ?: @"无数据"]];
             });
             return;
         }
+        [self log:@"qrconnect HTTP=%ld，%ld 字节", (long)httpCode, (long)data.length];
         // 微信页面是 utf-8
         NSString *html = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
         if (!html) html = [[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding];
@@ -172,6 +217,7 @@ static NSString *const kConfirmFormat =
         name = [name stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
 
         if (uuid.length == 0) {
+            [self log:@"❌ 未取到 uuid，HTML 前 500 字：%@", [html substringToIndex:MIN(500, html.length)]];
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self updateState:WXAuthStateError message:@"二维码解析失败（未取到 uuid）"];
             });
@@ -180,9 +226,11 @@ static NSString *const kConfirmFormat =
 
         self.serverUuid = uuid;
         if (name.length) self.appName = name;
+        [self log:@"✅ 服务器 uuid=%@ 应用名=%@", uuid, name ?: @"(无)"];
 
         // 二维码内容 = confirm?uuid=xxx（已通过解码服务器二维码图片验证）
         NSString *qrContent = [NSString stringWithFormat:kConfirmFormat, uuid];
+        [self log:@"二维码内容：%@", qrContent];
         UIImage *qr = [self generateQRCode:qrContent];
 
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -220,6 +268,7 @@ static NSString *const kConfirmFormat =
         if (!self || !self.polling || self.finished) return;
 
         if (error) {
+            [self log:@"轮询请求错误（2s 后重试）：%@", error.localizedDescription];
             // 超时/网络抖动，稍后继续
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{
@@ -234,23 +283,53 @@ static NSString *const kConfirmFormat =
         NSString *nickname = [self firstMatchIn:js pattern:@"wx_nickname='([^']*)'" group:1];
         int errcode = codeStr.intValue;
 
+        if (errcode != 408) {
+            [self log:@"轮询返回 errcode=%d，原始：%@", errcode,
+             [js length] ? [js stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] : @"(空)"];
+        }
+
         dispatch_async(dispatch_get_main_queue(), ^{
             switch (errcode) {
                 case 405: {
-                    // 授权成功
+                    // 授权成功：从 wx_redirecturl 解析 code，再用标准格式自行拼接回跳，保证 state 正确
                     self.finished = YES;
                     self.polling = NO;
                     [self updateState:WXAuthStateSuccess
                               message:[NSString stringWithFormat:@"%@授权成功，正在跳回…",
                                        nickname.length ? [nickname stringByAppendingString:@" "] : @""]];
-                    NSString *target = redirect.length ? redirect :
-                        [NSString stringWithFormat:@"%@://oauth?code=&state=%@",
-                         self.appid, [self urlEncode:self.stateParam ?: @""]];
+
+                    NSString *code = @"";
+                    if (redirect.length) {
+                        NSURLComponents *rc = [NSURLComponents componentsWithString:redirect];
+                        for (NSURLQueryItem *it in rc.queryItems) {
+                            if ([it.name isEqualToString:@"code"] && it.value.length) { code = it.value; break; }
+                        }
+                    }
+                    self.lastAuthCode = code;
+                    [self log:@"✅ 405 微信 redirect=%@", redirect.length ? redirect : @"(空)"];
+                    [self log:@"解析出 code=%@", code.length ? code : @"(空！)"];
+
+                    NSString *target = nil;
+                    if (code.length) {
+                        // 标准微信 SDK 回调：wxAPPID://oauth?code=CODE&state=STATE
+                        target = [NSString stringWithFormat:@"%@://oauth?code=%@&state=%@",
+                                  self.appid, code,
+                                  [self urlEncode:self.stateParam ?: @""]];
+                    } else if (redirect.length) {
+                        // 解析不到 code 时，原样回跳兜底
+                        target = redirect;
+                    } else {
+                        target = [NSString stringWithFormat:@"%@://oauth?code=&state=%@",
+                                  self.appid, [self urlEncode:self.stateParam ?: @""]];
+                    }
+                    self.lastCallbackURL = target;
+                    [self log:@"回跳 URL：%@", target];
                     [self openURLString:target];
                     break;
                 }
                 case 404:
                     // 已扫码，等待手机端确认
+                    [self log:@"⏳ 404 已扫码，等待手机确认"];
                     [self updateState:WXAuthStateScanned message:@"已扫码，请在手机微信上点击确认"];
                     [self scheduleNextPoll:1.0];
                     break;
@@ -258,6 +337,7 @@ static NSString *const kConfirmFormat =
                     // 用户取消
                     self.finished = YES;
                     self.polling = NO;
+                    [self log:@"用户取消（403）"];
                     [self updateState:WXAuthStateCancelled message:@"已取消授权"];
                     [self openURLString:[NSString stringWithFormat:@"%@://oauth?code=", self.appid]];
                     break;
@@ -306,6 +386,7 @@ static NSString *const kConfirmFormat =
         // 回调 scheme 是动态的（wx+appid://），无法全部加入 canOpenURL 白名单，
         // 因此直接 openURL，由 completionHandler 反馈结果。
         [app openURL:url options:@{} completionHandler:^(BOOL success) {
+            [self log:success ? @"✅ 已 openURL 跳回来源 App" : @"❌ openURL 失败（来源 App 未安装/未注册该 scheme）"];
             if (!success) {
                 [self updateState:WXAuthStateError message:@"无法跳回来源 App（未安装？）"];
             }

@@ -11,6 +11,7 @@
 @property (nonatomic, strong) UIImageView *qrImageView;
 @property (nonatomic, strong) UIButton *showButton;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
+@property (nonatomic, strong) UITextView *diagView;   // 临时诊断日志
 @end
 
 @implementation ViewController
@@ -23,12 +24,14 @@
 }
 
 - (void)setupUI {
+    UILayoutGuide *guide = self.view.safeAreaLayoutGuide;
+
     // 状态文字
     UILabel *statusLabel = [[UILabel alloc] init];
     statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     statusLabel.numberOfLines = 0;
     statusLabel.textAlignment = NSTextAlignmentCenter;
-    statusLabel.font = [UIFont systemFontOfSize:16];
+    statusLabel.font = [UIFont systemFontOfSize:15];
     statusLabel.textColor = [UIColor secondaryLabelColor];
     statusLabel.text = @"等待微信授权跳转…";
     [self.view addSubview:statusLabel];
@@ -46,7 +49,6 @@
     [self.view addSubview:qr];
     self.qrImageView = qr;
 
-    // 加载菊花
     UIActivityIndicatorView *spinner =
         [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
     spinner.translatesAutoresizingMaskIntoConstraints = NO;
@@ -58,34 +60,52 @@
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
     btn.translatesAutoresizingMaskIntoConstraints = NO;
     [btn setTitle:@"显  码" forState:UIControlStateNormal];
-    btn.titleLabel.font = [UIFont boldSystemFontOfSize:18];
+    btn.titleLabel.font = [UIFont boldSystemFontOfSize:17];
     btn.backgroundColor = [UIColor systemGreenColor];
     [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     btn.layer.cornerRadius = 10;
-    btn.contentEdgeInsets = UIEdgeInsetsMake(14, 40, 14, 40);
+    btn.contentEdgeInsets = UIEdgeInsetsMake(12, 40, 12, 40);
     [btn addTarget:self action:@selector(showCodeTapped) forControlEvents:UIControlEventTouchUpInside];
     btn.enabled = NO;
     btn.alpha = 0.4;
     [self.view addSubview:btn];
     self.showButton = btn;
 
-    UILayoutGuide *guide = self.view.safeAreaLayoutGuide;
-    [NSLayoutConstraint activateConstraints:@[
-        [statusLabel.topAnchor constraintEqualToAnchor:guide.topAnchor constant:40],
-        [statusLabel.leadingAnchor constraintEqualToAnchor:guide.leadingAnchor constant:24],
-        [statusLabel.trailingAnchor constraintEqualToAnchor:guide.trailingAnchor constant:-24],
+    // 诊断日志（临时排查用，可滚动小字）
+    UITextView *diag = [[UITextView alloc] init];
+    diag.translatesAutoresizingMaskIntoConstraints = NO;
+    diag.editable = NO;
+    diag.scrollEnabled = YES;
+    diag.font = [UIFont fontWithName:@"Menlo" size:10] ?: [UIFont systemFontOfSize:10];
+    diag.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.85];
+    diag.textColor = [UIColor colorWithRed:0.5 green:1.0 blue:0.6 alpha:1.0];
+    diag.layer.cornerRadius = 6;
+    diag.textContainerInset = UIEdgeInsetsMake(6, 6, 6, 6);
+    diag.text = @"诊断日志：\n（扫码确认后，把这一屏截图发回）\n";
+    [self.view addSubview:diag];
+    self.diagView = diag;
 
+    [NSLayoutConstraint activateConstraints:@[
+        [statusLabel.topAnchor constraintEqualToAnchor:guide.topAnchor constant:14],
+        [statusLabel.leadingAnchor constraintEqualToAnchor:guide.leadingAnchor constant:20],
+        [statusLabel.trailingAnchor constraintEqualToAnchor:guide.trailingAnchor constant:-20],
+
+        [qr.topAnchor constraintEqualToAnchor:statusLabel.bottomAnchor constant:12],
         [qr.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [qr.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:-30],
-        [qr.widthAnchor constraintEqualToConstant:260],
-        [qr.heightAnchor constraintEqualToConstant:260],
+        [qr.widthAnchor constraintEqualToConstant:170],
+        [qr.heightAnchor constraintEqualToConstant:170],
 
         [spinner.centerXAnchor constraintEqualToAnchor:qr.centerXAnchor],
         [spinner.centerYAnchor constraintEqualToAnchor:qr.centerYAnchor],
 
-        [btn.topAnchor constraintEqualToAnchor:qr.bottomAnchor constant:36],
+        [btn.topAnchor constraintEqualToAnchor:qr.bottomAnchor constant:14],
         [btn.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [btn.widthAnchor constraintGreaterThanOrEqualToConstant:180],
+        [btn.widthAnchor constraintGreaterThanOrEqualToConstant:160],
+
+        [diag.topAnchor constraintEqualToAnchor:btn.bottomAnchor constant:12],
+        [diag.leadingAnchor constraintEqualToAnchor:guide.leadingAnchor constant:10],
+        [diag.trailingAnchor constraintEqualToAnchor:guide.trailingAnchor constant:-10],
+        [diag.bottomAnchor constraintEqualToAnchor:guide.bottomAnchor constant:-10],
     ]];
 }
 
@@ -103,7 +123,6 @@
             } else {
                 [self.spinner stopAnimating];
             }
-            // 收到新的授权请求时，清掉上一次的二维码
             if (state == WXAuthStateReceived) {
                 self.qrImageView.image = nil;
             }
@@ -116,11 +135,21 @@
             self.qrImageView.image = image;
         });
     };
+    m.onDiagnostic = ^(NSString *text) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.diagView.text = text;
+            // 自动滚动到底部
+            if (text.length > 0) {
+                NSRange bottom = NSMakeRange(text.length - 1, 1);
+                [self.diagView scrollRangeToVisible:bottom];
+            }
+        });
+    };
 }
 
 - (void)refreshButtonForState:(WXAuthState)state {
-    // 收到请求、二维码过期、获取失败（可重试）时允许点显码；
-    // 获取中 / 等待扫码 / 已扫码 / 成功 / 取消 / 空闲时禁用。
     BOOL enabled = (state == WXAuthStateReceived ||
                     state == WXAuthStateExpired ||
                     state == WXAuthStateError);
