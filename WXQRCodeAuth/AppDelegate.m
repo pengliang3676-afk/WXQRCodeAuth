@@ -14,8 +14,8 @@ didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     ViewController *vc = [[ViewController alloc] init];
-    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
-    self.window.rootViewController = nav;
+    // 极简单页，直接用 ViewController 作为根，不显示导航栏
+    self.window.rootViewController = vc;
     [self.window makeKeyAndVisible];
 
     // 冷启动时由 URL 拉起

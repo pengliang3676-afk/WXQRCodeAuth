@@ -17,7 +17,6 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"微信显码";
     self.view.backgroundColor = [UIColor systemBackgroundColor];
     [self setupUI];
     [self bindManager];
@@ -104,6 +103,10 @@
             } else {
                 [self.spinner stopAnimating];
             }
+            // 收到新的授权请求时，清掉上一次的二维码
+            if (state == WXAuthStateReceived) {
+                self.qrImageView.image = nil;
+            }
         });
     };
     m.onQRCodeReady = ^(UIImage *image) {
@@ -116,27 +119,14 @@
 }
 
 - (void)refreshButtonForState:(WXAuthState)state {
-    BOOL canShow = (state == WXAuthStateReceived ||
+    // 收到请求、二维码过期、获取失败（可重试）时允许点显码；
+    // 获取中 / 等待扫码 / 已扫码 / 成功 / 取消 / 空闲时禁用。
+    BOOL enabled = (state == WXAuthStateReceived ||
                     state == WXAuthStateExpired ||
-                    state == WXAuthStateError ||
-                    state == WXAuthStateIdle);
-    // 只有收到请求后才允许点显码；出错/过期时可重试
-    if (state == WXAuthStateReceived || state == WXAuthStateExpired) {
-        self.showButton.enabled = YES;
-        self.showButton.alpha = 1.0;
-        [self.showButton setTitle:@"显  码" forState:UIControlStateNormal];
-    } else if (state == WXAuthStateWaitingScan ||
-               state == WXAuthStateScanned ||
-               state == WXAuthStateFetching) {
-        self.showButton.enabled = NO;
-        self.showButton.alpha = 0.4;
-    } else if (state == WXAuthStateSuccess) {
-        self.showButton.enabled = NO;
-        self.showButton.alpha = 0.4;
-    } else {
-        self.showButton.enabled = NO;
-        self.showButton.alpha = 0.4;
-    }
+                    state == WXAuthStateError);
+    self.showButton.enabled = enabled;
+    self.showButton.alpha = enabled ? 1.0 : 0.4;
+    [self.showButton setTitle:@"显  码" forState:UIControlStateNormal];
 }
 
 - (void)showCodeTapped {
