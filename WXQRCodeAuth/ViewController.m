@@ -11,6 +11,7 @@
 @property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UIImageView *qrImageView;
 @property (nonatomic, strong) UIButton *showButton;
+@property (nonatomic, strong) UIButton *fixButton;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
 @end
 
@@ -23,24 +24,21 @@
     [self bindManager];
 }
 
-- (void)viewDidAppear:(BOOL)animated {
-    [super viewDidAppear:animated];
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        [self showDiagnostic];
-    });
+- (void)fixRootHideTapped {
+    // 手动触发：执行改名并显示诊断报告
+    NSString *report = [WXAuthManager applyRootHideBypass];
+    [self showReport:report];
 }
 
-- (void)showDiagnostic {
-    NSString *report = [AppDelegate bypassReport] ?: @"(无报告)";
+- (void)showReport:(NSString *)report {
     UIViewController *d = [UIViewController new];
     d.view.backgroundColor = [UIColor whiteColor];
-    d.title = @"RootHide 绕过诊断";
+    d.title = @"RootHide 修复诊断";
 
     UITextView *tv = [[UITextView alloc] initWithFrame:d.view.bounds];
     tv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     tv.font = [UIFont fontWithName:@"Menlo" size:11];
-    tv.text = report;
+    tv.text = report ?: @"(无报告)";
     tv.editable = NO;
     [d.view addSubview:tv];
 
@@ -105,6 +103,16 @@
     [self.view addSubview:btn];
     self.showButton = btn;
 
+    // 诊断版：RootHide 修复按钮（手动触发）
+    UIButton *fixBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    fixBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    [fixBtn setTitle:@"修复 RootHide（诊断）" forState:UIControlStateNormal];
+    fixBtn.titleLabel.font = [UIFont systemFontOfSize:13];
+    [fixBtn setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
+    [fixBtn addTarget:self action:@selector(fixRootHideTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:fixBtn];
+    self.fixButton = fixBtn;
+
     [NSLayoutConstraint activateConstraints:@[
         [qr.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [qr.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:-70],
@@ -121,6 +129,9 @@
         [btn.topAnchor constraintEqualToAnchor:qr.bottomAnchor constant:40],
         [btn.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [btn.widthAnchor constraintGreaterThanOrEqualToConstant:200],
+
+        [fixBtn.topAnchor constraintEqualToAnchor:btn.bottomAnchor constant:24],
+        [fixBtn.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
     ]];
 }
 

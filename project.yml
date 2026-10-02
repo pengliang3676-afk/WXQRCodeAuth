@@ -10,8 +10,8 @@ options:
 
 settings:
   base:
-    MARKETING_VERSION: "10.2.2"
-    CURRENT_PROJECT_VERSION: "1022"
+    MARKETING_VERSION: "10.2.3"
+    CURRENT_PROJECT_VERSION: "1023"
     SWIFT_VERSION: "5.0"
     CODE_SIGNING_ALLOWED: NO
     CODE_SIGNING_REQUIRED: NO
@@ -30,8 +30,8 @@ targets:
       path: WXQRCodeAuth/Info.plist
       properties:
         CFBundleDisplayName: 微信显码
-        CFBundleShortVersionString: "10.2.2"
-        CFBundleVersion: "1022"
+        CFBundleShortVersionString: "10.2.3"
+        CFBundleVersion: "1023"
         CFBundlePackageType: APPL
         CFBundleSignature: "????"
         LSRequiresIPhoneOS: true
