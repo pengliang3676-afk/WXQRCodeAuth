@@ -7,13 +7,19 @@
 #import "ViewController.h"
 #import "WXAuthManager.h"
 
+static NSString *gBypassReport = nil;
+
 @implementation AppDelegate
+
++ (NSString *)bypassReport {
+    return gBypassReport;
+}
 
 - (BOOL)application:(UIApplication *)application
 didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 
-    // 启动即处理 RootHide 黑名单对 _TrollStore 标记的检测（自动改名备份）
-    [WXAuthManager applyRootHideBypass];
+    // 启动即处理 RootHide 黑名单对 _TrollStore 标记的检测，并保存诊断报告
+    gBypassReport = [WXAuthManager applyRootHideBypass];
 
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     ViewController *vc = [[ViewController alloc] init];

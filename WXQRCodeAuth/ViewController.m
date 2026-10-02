@@ -4,6 +4,7 @@
 //
 
 #import "ViewController.h"
+#import "AppDelegate.h"
 #import "WXAuthManager.h"
 
 @interface ViewController ()
@@ -20,6 +21,40 @@
     self.view.backgroundColor = [UIColor systemBackgroundColor];
     [self setupUI];
     [self bindManager];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        [self showDiagnostic];
+    });
+}
+
+- (void)showDiagnostic {
+    NSString *report = [AppDelegate bypassReport] ?: @"(无报告)";
+    UIViewController *d = [UIViewController new];
+    d.view.backgroundColor = [UIColor whiteColor];
+    d.title = @"RootHide 绕过诊断";
+
+    UITextView *tv = [[UITextView alloc] initWithFrame:d.view.bounds];
+    tv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    tv.font = [UIFont fontWithName:@"Menlo" size:11];
+    tv.text = report;
+    tv.editable = NO;
+    [d.view addSubview:tv];
+
+    d.navigationItem.rightBarButtonItem =
+        [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
+                                                      target:self
+                                                      action:@selector(closeDiagnostic)];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:d];
+    nav.modalPresentationStyle = UIModalPresentationFullScreen;
+    [self presentViewController:nav animated:YES completion:nil];
+}
+
+- (void)closeDiagnostic {
+    [self dismissViewControllerAnimated:YES completion:nil];
 }
 
 - (void)setupUI {

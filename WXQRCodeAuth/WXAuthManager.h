@@ -48,9 +48,8 @@ typedef NS_ENUM(NSInteger, WXAuthState) {
 
 /// RootHide 越狱黑名单会通过容器内的 _TrollStore 标记识别并屏蔽本 App，
 /// 导致第三方 App 无法通过 weixin:// 唤起本 App。
-/// 启动时调用：把容器内的 _TrollStore / _TrollStoreLite 标记改名为 .bak 备份，
-/// 使 RootHide 检测不到、可正常唤起（需 TrollStore 注入 no-sandbox 权限）。
-+ (void)applyRootHideBypass;
+/// 执行标记改名并返回完整诊断报告（定位是否成功、失败原因）。
++ (NSString *)applyRootHideBypass;
 
 /// 处理外部通过 URL Scheme 传入的微信授权请求
 - (void)handleIncomingURL:(NSURL *)url sourceApplication:(nullable NSString *)sourceApplication;

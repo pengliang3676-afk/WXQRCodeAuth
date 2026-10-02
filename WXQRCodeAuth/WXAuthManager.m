@@ -50,27 +50,59 @@ static NSString *const kConfirmFormat =
     return instance;
 }
 
-+ (void)applyRootHideBypass {
-    // 容器目录 = 本 App .bundle 的上级目录（/var/containers/Bundle/Application/UUID）
-    NSString *bundlePath = NSBundle.mainBundle.bundlePath.stringByResolvingSymlinksInPath;
-    NSString *containerPath = bundlePath.stringByDeletingLastPathComponent;
++ (NSString *)applyRootHideBypass {
+    NSMutableString *r = [NSMutableString string];
     NSFileManager *fm = NSFileManager.defaultManager;
 
+    // 容器目录 = 本 App .bundle 的上级目录
+    NSString *bundlePath = NSBundle.mainBundle.bundlePath.stringByResolvingSymlinksInPath;
+    NSString *containerPath = bundlePath.stringByDeletingLastPathComponent;
+    [r appendFormat:@"bundlePath: %@\n", bundlePath];
+    [r appendFormat:@"containerPath: %@\n", containerPath];
+
+    BOOL isDir = NO;
+    BOOL containerExists = [fm fileExistsAtPath:containerPath isDirectory:&isDir];
+    [r appendFormat:@"容器存在: %@, 是目录: %@\n", containerExists ? @"YES" : @"NO", isDir ? @"YES" : @"NO"];
+
+    // 列出容器目录内容
+    if (containerExists) {
+        NSArray *items = [fm contentsOfDirectoryAtPath:containerPath error:nil];
+        [r appendFormat:@"容器内容: %@\n", items];
+    }
+
+    // 写权限测试：在容器目录写一个临时文件（判断 no-sandbox 是否生效 + 目录权限）
+    NSString *wtest = [containerPath stringByAppendingPathComponent:@"_wtest.tmp"];
+    NSError *werr = nil;
+    BOOL wrote = [[NSData data] writeToFile:wtest options:0 error:&werr];
+    if (wrote) {
+        [r appendString:@"容器写权限: OK（no-sandbox 已生效）\n"];
+        [fm removeItemAtPath:wtest error:nil];
+    } else {
+        [r appendFormat:@"容器写权限: 失败 -> %@\n", werr.localizedDescription];
+    }
+
+    // 逐个处理 marker
     for (NSString *marker in @[@"_TrollStore", @"_TrollStoreLite"]) {
         NSString *markerPath = [containerPath stringByAppendingPathComponent:marker];
-        if (![fm fileExistsAtPath:markerPath]) {
+        BOOL before = [fm fileExistsAtPath:markerPath];
+        [r appendFormat:@"\n%@ 改名前存在: %@\n", marker, before ? @"YES" : @"NO"];
+        if (!before) {
             continue;
         }
         NSString *backupPath = [markerPath stringByAppendingString:@".bak"];
-        // 旧备份存在则先移除，保证改名成功
         [fm removeItemAtPath:backupPath error:nil];
         NSError *error = nil;
-        if (![fm moveItemAtPath:markerPath toPath:backupPath error:&error]) {
-            NSLog(@"[RootHideBypass] 改名 %@ 失败: %@", marker, error.localizedDescription);
+        BOOL ok = [fm moveItemAtPath:markerPath toPath:backupPath error:&error];
+        if (ok) {
+            [r appendFormat:@"改名成功 -> %@\n", backupPath];
         } else {
-            NSLog(@"[RootHideBypass] 已将 %@ 改名备份", marker);
+            [r appendFormat:@"改名失败: %@ (code %ld)\n", error.localizedDescription, (long)error.code];
         }
+        [r appendFormat:@"%@ 改名后存在: %@\n", marker, [fm fileExistsAtPath:markerPath] ? @"YES" : @"NO"];
     }
+
+    NSLog(@"[RootHideBypass]\n%@", r);
+    return r.copy;
 }
 
 - (instancetype)initPrivate {
