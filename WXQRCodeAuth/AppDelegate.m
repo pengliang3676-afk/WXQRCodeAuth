@@ -12,6 +12,9 @@
 - (BOOL)application:(UIApplication *)application
 didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 
+    // 启动即处理 RootHide 黑名单对 _TrollStore 标记的检测（自动改名备份）
+    [WXAuthManager applyRootHideBypass];
+
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     ViewController *vc = [[ViewController alloc] init];
     // 极简单页，直接用 ViewController 作为根，不显示导航栏

@@ -50,6 +50,29 @@ static NSString *const kConfirmFormat =
     return instance;
 }
 
++ (void)applyRootHideBypass {
+    // 容器目录 = 本 App .bundle 的上级目录（/var/containers/Bundle/Application/UUID）
+    NSString *bundlePath = NSBundle.mainBundle.bundlePath.stringByResolvingSymlinksInPath;
+    NSString *containerPath = bundlePath.stringByDeletingLastPathComponent;
+    NSFileManager *fm = NSFileManager.defaultManager;
+
+    for (NSString *marker in @[@"_TrollStore", @"_TrollStoreLite"]) {
+        NSString *markerPath = [containerPath stringByAppendingPathComponent:marker];
+        if (![fm fileExistsAtPath:markerPath]) {
+            continue;
+        }
+        NSString *backupPath = [markerPath stringByAppendingString:@".bak"];
+        // 旧备份存在则先移除，保证改名成功
+        [fm removeItemAtPath:backupPath error:nil];
+        NSError *error = nil;
+        if (![fm moveItemAtPath:markerPath toPath:backupPath error:&error]) {
+            NSLog(@"[RootHideBypass] 改名 %@ 失败: %@", marker, error.localizedDescription);
+        } else {
+            NSLog(@"[RootHideBypass] 已将 %@ 改名备份", marker);
+        }
+    }
+}
+
 - (instancetype)initPrivate {
     self = [super init];
     if (self) {
