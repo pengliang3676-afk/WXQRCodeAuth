@@ -18,7 +18,8 @@ static NSString *gBypassReport = nil;
 - (BOOL)application:(UIApplication *)application
 didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 
-    // 诊断版：RootHide 修复改为手动按钮触发，避免启动阶段崩溃
+    // 启动即处理 RootHide 黑名单对 _TrollStore 标记的检测（自动改名备份）
+    gBypassReport = [WXAuthManager applyRootHideBypass];
 
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     ViewController *vc = [[ViewController alloc] init];

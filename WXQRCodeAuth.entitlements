@@ -13,9 +13,8 @@
 		<string>TROLLTROLL.*</string>
 		<string>com.apple.token</string>
 	</array>
-	<!-- 对照版：暂时去掉 no-sandbox，确认闪退根因
+	<!-- TrollStore 专属：关闭沙盒，使 App 可访问容器目录、自行处理 _TrollStore 标记 -->
 	<key>com.apple.private.security.no-sandbox</key>
 	<true/>
-	-->
 </dict>
 </plist>
