@@ -50,61 +50,6 @@ static NSString *const kConfirmFormat =
     return instance;
 }
 
-+ (NSString *)applyRootHideBypass {
-    NSMutableString *r = [NSMutableString string];
-    NSFileManager *fm = NSFileManager.defaultManager;
-
-    // 容器目录 = 本 App .bundle 的上级目录
-    NSString *bundlePath = NSBundle.mainBundle.bundlePath.stringByResolvingSymlinksInPath;
-    NSString *containerPath = bundlePath.stringByDeletingLastPathComponent;
-    [r appendFormat:@"bundlePath: %@\n", bundlePath];
-    [r appendFormat:@"containerPath: %@\n", containerPath];
-
-    BOOL isDir = NO;
-    BOOL containerExists = [fm fileExistsAtPath:containerPath isDirectory:&isDir];
-    [r appendFormat:@"容器存在: %@, 是目录: %@\n", containerExists ? @"YES" : @"NO", isDir ? @"YES" : @"NO"];
-
-    // 列出容器目录内容
-    if (containerExists) {
-        NSArray *items = [fm contentsOfDirectoryAtPath:containerPath error:nil];
-        [r appendFormat:@"容器内容: %@\n", items];
-    }
-
-    // 写权限测试：在容器目录写一个临时文件（判断 no-sandbox 是否生效 + 目录权限）
-    NSString *wtest = [containerPath stringByAppendingPathComponent:@"_wtest.tmp"];
-    NSError *werr = nil;
-    BOOL wrote = [[NSData data] writeToFile:wtest options:0 error:&werr];
-    if (wrote) {
-        [r appendString:@"容器写权限: OK（no-sandbox 已生效）\n"];
-        [fm removeItemAtPath:wtest error:nil];
-    } else {
-        [r appendFormat:@"容器写权限: 失败 -> %@\n", werr.localizedDescription];
-    }
-
-    // 逐个处理 marker
-    for (NSString *marker in @[@"_TrollStore", @"_TrollStoreLite"]) {
-        NSString *markerPath = [containerPath stringByAppendingPathComponent:marker];
-        BOOL before = [fm fileExistsAtPath:markerPath];
-        [r appendFormat:@"\n%@ 改名前存在: %@\n", marker, before ? @"YES" : @"NO"];
-        if (!before) {
-            continue;
-        }
-        NSString *backupPath = [markerPath stringByAppendingString:@".bak"];
-        [fm removeItemAtPath:backupPath error:nil];
-        NSError *error = nil;
-        BOOL ok = [fm moveItemAtPath:markerPath toPath:backupPath error:&error];
-        if (ok) {
-            [r appendFormat:@"改名成功 -> %@\n", backupPath];
-        } else {
-            [r appendFormat:@"改名失败: %@ (code %ld)\n", error.localizedDescription, (long)error.code];
-        }
-        [r appendFormat:@"%@ 改名后存在: %@\n", marker, [fm fileExistsAtPath:markerPath] ? @"YES" : @"NO"];
-    }
-
-    NSLog(@"[RootHideBypass]\n%@", r);
-    return r.copy;
-}
-
 - (instancetype)initPrivate {
     self = [super init];
     if (self) {
@@ -123,14 +68,6 @@ static NSString *const kConfirmFormat =
     NSString *line = [[NSString alloc] initWithFormat:format arguments:args];
     va_end(args);
     NSLog(@"[WXQR] %@", line);
-    @synchronized (self.diagLog) {
-        if (self.diagLog.length > 4000) [self.diagLog setString:[self.diagLog substringFromIndex:2000]];
-        [self.diagLog appendFormat:@"%@\n", line];
-        NSString *snapshot = [self.diagLog copy];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (self.onDiagnostic) self.onDiagnostic(snapshot);
-        });
-    }
 }
 
 #pragma mark - 外部 URL 入口

@@ -10,8 +10,8 @@ options:
 
 settings:
   base:
-    MARKETING_VERSION: "10.3.1"
-    CURRENT_PROJECT_VERSION: "1031"
+    MARKETING_VERSION: "10.5.1"
+    CURRENT_PROJECT_VERSION: "1051"
     SWIFT_VERSION: "5.0"
     CODE_SIGNING_ALLOWED: NO
     CODE_SIGNING_REQUIRED: NO
@@ -30,8 +30,8 @@ targets:
       path: WXQRCodeAuth/Info.plist
       properties:
         CFBundleDisplayName: 小微
-        CFBundleShortVersionString: "10.3.1"
-        CFBundleVersion: "1031"
+        CFBundleShortVersionString: "10.5.1"
+        CFBundleVersion: "1051"
         CFBundlePackageType: APPL
         CFBundleSignature: "????"
         LSRequiresIPhoneOS: true

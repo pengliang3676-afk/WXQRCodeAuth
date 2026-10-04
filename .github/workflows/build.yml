@@ -49,7 +49,7 @@ jobs:
 
       - name: Inject entitlements with ldid
         run: |
-          # 给二进制注入 TrollStore 专属的 no-sandbox 权限（关闭沙盒）
+          # 给二进制注入 TrollStore 基础 entitlements
           if ! command -v ldid >/dev/null 2>&1; then
             HOMEBREW_NO_AUTO_UPDATE=1 brew install ldid
           fi
