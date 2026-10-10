@@ -1,12 +1,12 @@
 # IP 归属地查询
 
-适配 iPhone SE 2 的轻量 iOS IP 查询应用。打开后会查询当前公网 IP，也可以输入 IPv4 或 IPv6 地址查看归属地、运营商、ASN、时区和坐标。
+适配 iPhone SE 2 的轻量 iOS IP 查询应用。打开后自动查询当前公网 IP，并醒目显示中文归属地和运营商；可查看 ASN、时区和坐标。
 
 ## 基础项目与许可
 
-本项目基于 [What IP](https://github.com/JesusChapman/What-ip) 的开源 iOS 项目进行改造，采用其 GPL-3.0 许可，并保留原项目应用图标。改造依据的上游提交为 `a95f81ad55697d94f786b196fc122e1fcc4be88a`。上游要求 iOS 26；本项目改为 iOS 15 起可运行，移除仅适用于新系统的界面效果，加入中文界面和指定 IP 查询。
+本项目基于 [What IP](https://github.com/JesusChapman/What-ip) 的开源 iOS 项目进行改造，采用其 GPL-3.0 许可，并保留原项目应用图标。改造依据的上游提交为 `a95f81ad55697d94f786b196fc122e1fcc4be88a`。上游要求 iOS 26；本项目改为 iOS 15 起可运行，加入中文界面，并使用中文归属地和常见运营商名称。
 
-IP 数据由 [ipwho.is](https://ipwho.is/) 提供。查询时会将待查 IP 发送给该服务，结果仅为 IP 注册及网络信息估算，不能代表设备的精确位置。
+IP 数据由 [ipwho.is](https://ipwho.is/) 提供。应用会将当前公网 IP 发送给该服务；归属地使用简体中文，常见运营商名称会转换为中文。结果仅为 IP 网络位置估算，不能代表设备的精确位置。
 
 ## 构建 TrollStore IPA
 

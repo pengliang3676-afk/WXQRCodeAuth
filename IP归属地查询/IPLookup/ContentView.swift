@@ -2,7 +2,6 @@ import SwiftUI
 import UIKit
 
 struct ContentView: View {
-    @State private var inputIP = ""
     @State private var result: IPInfo?
     @State private var errorMessage: String?
     @State private var isLoading = false
@@ -18,7 +17,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     header
                     currentIPCard
-                    searchCard
+                    locationCarrierCard
 
                     if let errorMessage {
                         errorCard(errorMessage)
@@ -139,79 +138,65 @@ struct ContentView: View {
         .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
     }
 
-    private var searchCard: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            Text("查询指定 IP")
-                .font(.system(size: 15, weight: .bold))
+    private var locationCarrierCard: some View {
+        let location = result?.locationText ?? ""
+        let carrier = result?.localizedISP ?? ""
+
+        return VStack(alignment: .leading, spacing: 0) {
+            Label("IP 归属地", systemImage: "mappin.and.ellipse")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Color(red: 0.63, green: 0.85, blue: 1.0))
+
+            Text(!location.isEmpty ? location : (isLoading ? "正在查询归属地…" : "暂无数据"))
+                .font(.system(size: 21, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
+                .padding(.top, 9)
 
-            HStack(spacing: 9) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.white.opacity(0.42))
-                    TextField("输入 IPv4 或 IPv6 地址", text: $inputIP)
-                        .font(.system(size: 14, design: .monospaced))
-                        .foregroundColor(.white)
-                        .keyboardType(.numbersAndPunctuation)
-                        .textInputAutocapitalization(.never)
-                        .submitLabel(.search)
-                        .onSubmit { Task { await lookup(ip: inputIP) } }
-                        .accessibilityLabel("要查询的 IP 地址")
-                }
-                .padding(.horizontal, 13)
-                .frame(height: 49)
-                .background(Color.black.opacity(0.20))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.10), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            Rectangle()
+                .fill(Color.white.opacity(0.14))
+                .frame(height: 1)
+                .padding(.vertical, 15)
 
-                Button {
-                    Task { await lookup(ip: inputIP) }
-                } label: {
-                    Group {
-                        if isLoading {
-                            ProgressView().tint(.white)
-                        } else {
-                            Label("查询", systemImage: "arrow.right")
-                                .font(.system(size: 14, weight: .bold))
-                        }
-                    }
-                    .foregroundColor(.white)
-                    .frame(minWidth: 78, minHeight: 49)
-                    .background(Color(red: 0.18, green: 0.52, blue: 0.80))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                }
-                .disabled(isLoading)
-            }
+            Label("运营商", systemImage: "antenna.radiowaves.left.and.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Color(red: 0.63, green: 0.85, blue: 1.0))
 
-            Button {
-                inputIP = ""
-                Task { await lookup(ip: "") }
-            } label: {
-                Label("查询本机公网 IP", systemImage: "iphone")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.64))
-            }
-            .disabled(isLoading)
+            Text(!carrier.isEmpty ? carrier : (isLoading ? "正在识别运营商…" : "暂无数据"))
+                .font(.system(size: 19, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
+                .padding(.top, 8)
         }
-        .padding(16)
-        .background(Color.white.opacity(0.07))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.white.opacity(0.08), lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.12, green: 0.34, blue: 0.53).opacity(0.92), Color(red: 0.25, green: 0.20, blue: 0.43).opacity(0.94)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Color.white.opacity(0.16), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private func detailsCard(_ info: IPInfo) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("查询结果")
+            Text("其他信息")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(.white)
                 .padding(.bottom, 5)
 
-            detailRow(title: "归属地", value: info.locationText, icon: "mappin.and.ellipse")
-            detailRow(title: "运营商", value: info.connection?.isp, icon: "antenna.radiowaves.left.and.right")
-            detailRow(title: "网络组织", value: info.connection?.org, icon: "building.2")
+            detailRow(title: "网络组织", value: info.localizedOrganization, icon: "building.2")
             detailRow(title: "ASN", value: info.connection?.asn.map { "AS\($0)" }, icon: "number")
 
-            let zone = [info.timezone?.id, info.timezone?.utc].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "  ·  ")
+            let timezoneName = info.timezone?.id.map { id in
+                ["Asia/Shanghai": "中国标准时间", "Asia/Hong_Kong": "香港时间", "Asia/Taipei": "台北时间", "Asia/Tokyo": "日本标准时间", "Asia/Seoul": "韩国标准时间"][id] ?? id
+            }
+            let zone = [timezoneName, info.timezone?.utc].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "  ·  ")
             detailRow(title: "时区", value: zone.isEmpty ? nil : zone, icon: "clock")
             detailRow(title: "坐标", value: info.coordinatesText, icon: "location")
             detailRow(title: "邮编", value: info.postal, icon: "envelope")
@@ -275,7 +260,7 @@ struct ContentView: View {
 
     private var privacyNote: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("查询服务：ipwho.is。启动时会查询本机公网 IP；手动查询会将输入地址发送给该服务。归属地是估算信息，可能与实际位置不同。")
+            Text("查询服务：ipwho.is。启动和刷新时会将本机公网 IP 发送给该服务。归属地是估算信息，可能与实际位置不同。")
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.42))
                 .fixedSize(horizontal: false, vertical: true)
