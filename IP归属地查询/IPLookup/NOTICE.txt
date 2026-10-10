@@ -1,0 +1,3 @@
+IP 归属地查询 is derived from the open-source iOS project What IP by Jesus Chapman.
+Copyright notice and GPL-3.0 license are included in this app bundle.
+Project source: https://github.com/JesusChapman/What-ip

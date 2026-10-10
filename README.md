@@ -74,3 +74,7 @@ zip -qr WXQRCodeAuth.ipa Payload
 | 405 | 授权成功 | 取 redirecturl 回跳来源 App |
 | 403 | 用户取消 | 回跳来源 App（空 code） |
 | 402 / 500 | 过期 / 错误 | 自动重新获取二维码 |
+
+## IP 归属地查询（独立应用）
+
+本仓库另含一款适配 iPhone SE 2 的 IP 查询 App，源码和使用说明位于 [`IP归属地查询/`](IP归属地查询/README.md)。它支持当前公网 IP 及指定 IPv4/IPv6 查询；对应的 **Build IP Lookup TrollStore IPA** 工作流生成独立 IPA，不影响上方 WXQRCodeAuth 的构建。

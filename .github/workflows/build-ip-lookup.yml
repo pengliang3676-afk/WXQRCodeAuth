@@ -1,0 +1,42 @@
+name: Build IP Lookup TrollStore IPA
+
+on:
+  push:
+    branches:
+      - codex/ip-lookup
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build unsigned iOS app
+        run: >-
+          xcodebuild
+          -project "IP归属地查询/IP归属地查询.xcodeproj"
+          -scheme IPLookup
+          -configuration Release
+          -sdk iphoneos
+          -destination 'generic/platform=iOS'
+          -derivedDataPath "$RUNNER_TEMP/derived"
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Package IPA for TrollStore
+        run: |
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$RUNNER_TEMP/derived/Build/Products/Release-iphoneos/IPLookup.app" "$RUNNER_TEMP/ipa/Payload/"
+          (cd "$RUNNER_TEMP/ipa" && /usr/bin/zip -qry "$GITHUB_WORKSPACE/IP归属地查询-TrollStore.ipa" Payload)
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: IP归属地查询-TrollStore-IPA
+          path: IP归属地查询-TrollStore.ipa
+          if-no-files-found: error
